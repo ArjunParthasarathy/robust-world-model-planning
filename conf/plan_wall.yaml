@@ -20,7 +20,7 @@ debug_dset_init: False
 objective:
   _target_: planning.objectives.create_objective_fn
   alpha: 1
-  base: 0.5
+  base: 2.0
   mode: all
 
 # closed-loop
