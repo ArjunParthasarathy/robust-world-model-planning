@@ -409,9 +409,8 @@ def planning_main(cfg_dict):
     output_dir = cfg_dict["saved_folder"]
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if cfg_dict["wandb_logging"]:
-        wandb_run = wandb.init(
-            project=f"plan_{cfg_dict['planner']['name']}", config=cfg_dict
-        )
+        project = cfg_dict.get("wandb_project") or f"plan_{cfg_dict['planner']['name']}"
+        wandb_run = wandb.init(project=project, config=cfg_dict)
         wandb.run.name = "{}".format(output_dir.split("plan_outputs/")[-1])
     else:
         wandb_run = None

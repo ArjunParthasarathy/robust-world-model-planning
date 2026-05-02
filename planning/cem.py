@@ -61,7 +61,7 @@ class CEMPlanner(BasePlanner):
             mu = torch.cat([mu, new_mu.to(device)], dim=1)
         return mu, sigma
 
-    def plan(self, obs_0, obs_g, actions=None):
+    def plan(self, obs_0, obs_g, actions=None, **kwargs):
         """
         Args:
             actions: normalized
@@ -105,12 +105,12 @@ class CEMPlanner(BasePlanner):
                 )
                 action[0] = mu[traj]  # optional: make the first one mu itself
                 with torch.no_grad():
-                    i_z_obses, i_zs = self.wm.rollout(
+                    i_z_obses = self.wm.custom_rollout(
                         obs_0=cur_trans_obs_0,
-                        act=action,
+                        actions=action.unsqueeze(2),
                     )
 
-                loss = self.objective_fn(i_z_obses, cur_z_obs_g)
+                loss = self.objective_fn(i_z_obses, cur_z_obs_g, i)
                 topk_idx = torch.argsort(loss)[: self.topk]
                 topk_action = action[topk_idx]
                 losses.append(loss[topk_idx[0]].item())

@@ -1,3 +1,4 @@
+import time
 import torch
 import hydra
 import copy
@@ -26,6 +27,7 @@ class MPCPlanner(BasePlanner):
         wandb_run,
         logging_prefix="mpc",
         log_filename="logs.json",
+        save_video=True,
         **kwargs,
     ):
         super().__init__(
@@ -52,10 +54,12 @@ class MPCPlanner(BasePlanner):
             wandb_run=self.wandb_run,
             log_filename=None,
         )
+        self.save_video = save_video
         self.is_success = None
         self.action_len = None  # keep track of the step each traj reaches success
         self.iter = 0
         self.planned_actions = []
+        self.step_times = []
 
     def _apply_success_mask(self, actions):
         device = actions.device
@@ -84,12 +88,15 @@ class MPCPlanner(BasePlanner):
         memo_actions = None
         while not np.all(self.is_success) and self.iter < self.max_iter:
             self.sub_planner.logging_prefix = f"plan_{self.iter}"
+            t_plan_start = time.time()
             actions, _ = self.sub_planner.plan(
                 obs_0=cur_obs_0,
                 obs_g=obs_g,
                 actions=memo_actions,
                 step=self.iter
             )  # (b, t, act_dim)
+            step_time = time.time() - t_plan_start
+            self.step_times.append(step_time)
             taken_actions = actions.detach()[:, : self.n_taken_actions]
             self._apply_success_mask(taken_actions)
             memo_actions = actions.detach()[:, self.n_taken_actions :]
@@ -105,7 +112,7 @@ class MPCPlanner(BasePlanner):
                 action_so_far,
                 self.action_len,
                 filename=f"plan{self.iter}",
-                save_video=True,
+                save_video=self.save_video,
             )
             new_successes = successes & ~self.is_success  # Identify new successes
             self.is_success = (
@@ -117,7 +124,7 @@ class MPCPlanner(BasePlanner):
 
             print("self.is_success: ", self.is_success)
             logs = {f"{self.logging_prefix}/{k}": v for k, v in logs.items()}
-            logs.update({"step": self.iter + 1})
+            logs.update({"step": self.iter + 1, f"{self.logging_prefix}/step_time_sec": step_time})
             self.wandb_run.log(logs)
             self.dump_logs(logs)
 
