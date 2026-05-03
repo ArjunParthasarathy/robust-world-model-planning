@@ -8,7 +8,7 @@ hydra:
 ckpt_path: ./outputs/pusht/
 model_epoch: latest
 
-seed: 42
+seed: 99
 n_evals: 50
 goal_source: 'dset'
 goal_H: 5

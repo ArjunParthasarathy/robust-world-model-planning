@@ -8,7 +8,7 @@ hydra:
 ckpt_path: ./outputs/pusht/
 model_epoch: latest
 
-seed: 42
+seed: 99
 n_evals: 50
 goal_source: 'dset'
 goal_H: 5
@@ -31,7 +31,7 @@ planner:
   save_video: false
   sub_planner:
     action_noise: 0.003
-    eval_every: 99999
+    eval_every: 80
     horizon: 5
     lr: 0.2
     opt_steps: 100

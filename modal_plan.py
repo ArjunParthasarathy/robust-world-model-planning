@@ -642,8 +642,84 @@ def collect_and_plot():
 
 
 # ---------------------------------------------------------------------------
+# Remote orchestrators (run inside Modal — survive local disconnect)
+# ---------------------------------------------------------------------------
+
+@app.function(**{**_CPU_SWEEP_KWARGS, "timeout": 3600 * 12})
+def _orchestrate_cem(n_evals: int = 50, seed: int = 42, values=None):
+    """Runs inside a Modal container: waits for CEM jobs then plots."""
+    if values is None:
+        values = _CEM_NUM_SAMPLES
+    handles = []
+    for ns in values:
+        h = plan_sweep.spawn(env_name="pusht", method="pretrained",
+                             planner_type="cem", sweep_value=ns,
+                             seed=seed, n_evals=n_evals)
+        handles.append((f"cem/ns={ns}", h))
+        print(f"  spawned pretrained/cem/ns={ns}")
+
+    for tag, h in handles:
+        try:
+            ret = h.get()
+            print(f"  DONE {tag} → {ret['output_dir']}")
+        except Exception as e:
+            print(f"  FAILED {tag}: {e}")
+
+    print("CEM jobs done. Generating plot...")
+    collect_and_plot.remote()
+    print("Plot committed to volume.")
+
+
+# ---------------------------------------------------------------------------
 # Entrypoints
 # ---------------------------------------------------------------------------
+
+@app.local_entrypoint()
+def run_cem_sweep(n_evals: int = 50, seed: int = 42):
+    """Launch CEM sweep jobs via a remote orchestrator (survives local disconnect).
+
+    The orchestrator runs inside Modal — safe to close your terminal.
+    Monitor progress via W&B project: pusht_sweep
+
+    Examples:
+        modal run modal_plan.py::run_cem_sweep
+        modal run modal_plan.py::run_cem_sweep --n-evals 50 --seed 42
+    """
+    _orchestrate_cem.spawn(n_evals=n_evals, seed=seed)
+    print("CEM orchestrator launched on Modal (runs independently).")
+    print("Monitor: https://wandb.ai/avp2145-columbia-university/pusht_sweep")
+    print("When done, download results:")
+    print("  modal volume get stableworldmodel sweep_results/pusht_sweep_plot.png .")
+    print("  modal volume get stableworldmodel sweep_results/pusht_sweep.csv .")
+
+
+@app.local_entrypoint()
+def run_one_sweep(
+    env_name: str = "pusht",
+    method: str = "adversarial",
+    planner_type: str = "gd",
+    sweep_value: int = 100,
+    seed: int = 99,
+    n_evals: int = 50,
+):
+    """Run a single sweep cell and print the result.
+
+    Examples:
+        modal run modal_plan.py::run_one_sweep
+        modal run modal_plan.py::run_one_sweep --method adversarial --planner-type gd --sweep-value 100 --seed 99
+    """
+    ret = plan_sweep.remote(
+        env_name=env_name,
+        method=method,
+        planner_type=planner_type,
+        sweep_value=sweep_value,
+        seed=seed,
+        n_evals=n_evals,
+    )
+    print(f"Done. output_dir={ret['output_dir']}")
+    print("To fetch logs:")
+    print(f"  modal volume get stableworldmodel {ret['output_dir'].replace('/root/.robust_worldmodel/', 'sweep_results/')}logs.json .")
+
 
 @app.local_entrypoint()
 def run_sweep(n_evals: int = 50, seed: int = 42):
@@ -748,3 +824,20 @@ def main(
         n_evals=n_evals,
     )
     print(f"Planning result: {ret}")
+
+
+@app.local_entrypoint()
+def plot():
+    """Collect results from volume and regenerate the sweep plot/CSV.
+
+    Run after all sweep jobs have finished:
+        modal run modal_plan.py::plot
+    Then download:
+        modal volume get stableworldmodel sweep_results/pusht_sweep_plot.png .
+        modal volume get stableworldmodel sweep_results/pusht_sweep.csv .
+    """
+    plot_path = collect_and_plot.remote()
+    print(f"Plot saved at: {plot_path}")
+    print("Download with:")
+    print("  modal volume get stableworldmodel sweep_results/pusht_sweep_plot.png .")
+    print("  modal volume get stableworldmodel sweep_results/pusht_sweep.csv .")

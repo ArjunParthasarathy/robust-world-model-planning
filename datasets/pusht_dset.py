@@ -147,7 +147,6 @@ def load_pusht_slice_train_val(
     val_rollout_steps=100,
     frameskip=0,
     with_velocity=True,
-    **kwargs,
 ):
     full_train_dset = PushTDataset(
         n_rollout=n_rollout,
