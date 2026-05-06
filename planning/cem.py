@@ -105,9 +105,9 @@ class CEMPlanner(BasePlanner):
                 )
                 action[0] = mu[traj]  # optional: make the first one mu itself
                 with torch.no_grad():
-                    i_z_obses = self.wm.custom_rollout(
+                    i_z_obses, i_zs = self.wm.rollout(
                         obs_0=cur_trans_obs_0,
-                        actions=action.unsqueeze(2),
+                        act=action,
                     )
 
                 loss = self.objective_fn(i_z_obses, cur_z_obs_g, i)

@@ -21,7 +21,7 @@ wandb_project: pusht_sweep
 objective:
   _target_: planning.objectives.create_objective_fn
   alpha: 1
-  base: 0.5
+  base: 2
   mode: all
 
 planner:

@@ -1,0 +1,16 @@
+config,method,planner_type,sweep_value,final_success_rate,mean_step_time_sec
+pretrained/MPC+CEM,pretrained,cem,20,0.0,193.42903839747112
+pretrained/MPC+CEM,pretrained,cem,50,0.44,390.26197825431825
+pretrained/MPC+CEM,pretrained,cem,100,0.46,713.0567841529846
+pretrained/MPC+CEM,pretrained,cem,200,0.5,1412.3682451725006
+pretrained/MPC+CEM,pretrained,cem,300,0.44,2069.843663958942
+pretrained/MPC+GD,pretrained,gd,5,0.4,6.255651307106018
+pretrained/MPC+GD,pretrained,gd,10,0.42,10.364239589373271
+pretrained/MPC+GD,pretrained,gd,20,0.5,16.025767183303834
+pretrained/MPC+GD,pretrained,gd,50,0.44,38.70749487195696
+pretrained/MPC+GD,pretrained,gd,100,0.52,73.60923244953156
+adversarial/MPC+GD,adversarial,gd,5,0.3,5.273657059669494
+adversarial/MPC+GD,adversarial,gd,10,0.24,8.995098304748534
+adversarial/MPC+GD,adversarial,gd,20,0.36,15.729120373725891
+adversarial/MPC+GD,adversarial,gd,50,0.5,36.900353050231935
+adversarial/MPC+GD,adversarial,gd,100,0.54,69.80126855373382

@@ -58,8 +58,6 @@ class GDPlanner(BasePlanner):
 
         if remaining_t > 0:
             if self.sample_type == "randn":
-                torch.cuda.manual_seed(617)
-                torch.manual_seed(617)
                 new_actions = torch.randn(n_evals, remaining_t, self.action_dim)
             elif self.sample_type == "zero":  # zero action of env
                 new_actions = torch.zeros(n_evals, remaining_t, self.action_dim)

@@ -409,7 +409,7 @@ def download_datasets(env_name: str):
 def plan(
     env_name: str = "pusht",
     method: str = "pretrained",
-    seed: int = 42,
+    seed: int = 99,
     n_evals: int = 50,
 ):
     """Run one seed of MPC planning and save results to the volume."""
@@ -453,7 +453,7 @@ def plan_sweep(
     method: str = "pretrained",
     planner_type: str = "gd",   # "gd" or "cem"
     sweep_value: int = 100,
-    seed: int = 42,
+    seed: int = 99,
     n_evals: int = 50,
 ):
     """Run one sweep cell: MPC+GD or MPC+CEM with a specific budget value."""
@@ -544,7 +544,7 @@ def collect_and_plot():
         ("adversarial/MPC+GD", "adversarial", "gd", _GD_OPT_STEPS),
     ]
 
-    def read_run(method, planner_type, sweep_value, seed=42):
+    def read_run(method, planner_type, sweep_value, seed=99):
         run_dir = sweep_root / method / f"{planner_type}_{sweep_value}" / f"seed{seed}"
         logs_path = run_dir / "logs.json"
         if not logs_path.exists():
@@ -645,27 +645,45 @@ def collect_and_plot():
 # Remote orchestrators (run inside Modal — survive local disconnect)
 # ---------------------------------------------------------------------------
 
+
 @app.function(**{**_CPU_SWEEP_KWARGS, "timeout": 3600 * 12})
-def _orchestrate_cem(n_evals: int = 50, seed: int = 42, values=None):
-    """Runs inside a Modal container: waits for CEM jobs then plots."""
-    if values is None:
-        values = _CEM_NUM_SAMPLES
-    handles = []
-    for ns in values:
+def _orchestrate_sweep(n_evals: int = 50, seed: int = 99):
+    """Runs inside a Modal container: spawns all 15 sweep jobs and waits. Safe against local disconnect."""
+    sweep_jobs = []
+
+    for ns in _CEM_NUM_SAMPLES:
+        tag = f"pretrained/cem/ns={ns}"
         h = plan_sweep.spawn(env_name="pusht", method="pretrained",
                              planner_type="cem", sweep_value=ns,
                              seed=seed, n_evals=n_evals)
-        handles.append((f"cem/ns={ns}", h))
-        print(f"  spawned pretrained/cem/ns={ns}")
+        sweep_jobs.append((tag, h))
+        print(f"  spawned {tag}")
 
-    for tag, h in handles:
+    for os_ in _GD_OPT_STEPS:
+        tag = f"pretrained/gd/opt={os_}"
+        h = plan_sweep.spawn(env_name="pusht", method="pretrained",
+                             planner_type="gd", sweep_value=os_,
+                             seed=seed, n_evals=n_evals)
+        sweep_jobs.append((tag, h))
+        print(f"  spawned {tag}")
+
+    for os_ in _GD_OPT_STEPS:
+        tag = f"adversarial/gd/opt={os_}"
+        h = plan_sweep.spawn(env_name="pusht", method="adversarial",
+                             planner_type="gd", sweep_value=os_,
+                             seed=seed, n_evals=n_evals)
+        sweep_jobs.append((tag, h))
+        print(f"  spawned {tag}")
+
+    print(f"All {len(sweep_jobs)} jobs spawned. Waiting for results...")
+    for tag, h in sweep_jobs:
         try:
             ret = h.get()
-            print(f"  DONE {tag} → {ret['output_dir']}")
+            print(f"  DONE  {tag}  →  output_dir={ret['output_dir']}")
         except Exception as e:
             print(f"  FAILED {tag}: {e}")
 
-    print("CEM jobs done. Generating plot...")
+    print("All sweep jobs finished. Generating plot...")
     collect_and_plot.remote()
     print("Plot committed to volume.")
 
@@ -674,20 +692,17 @@ def _orchestrate_cem(n_evals: int = 50, seed: int = 42, values=None):
 # Entrypoints
 # ---------------------------------------------------------------------------
 
-@app.local_entrypoint()
-def run_cem_sweep(n_evals: int = 50, seed: int = 42):
-    """Launch CEM sweep jobs via a remote orchestrator (survives local disconnect).
 
-    The orchestrator runs inside Modal — safe to close your terminal.
-    Monitor progress via W&B project: pusht_sweep
+@app.local_entrypoint()
+def run_sweep_remote(n_evals: int = 50, seed: int = 99):
+    """Launch all 15 sweep jobs via a remote orchestrator — safe to close your terminal.
 
     Examples:
-        modal run modal_plan.py::run_cem_sweep
-        modal run modal_plan.py::run_cem_sweep --n-evals 50 --seed 42
+        modal run modal_plan.py::run_sweep_remote
+        modal run modal_plan.py::run_sweep_remote --n-evals 50 --seed 99
     """
-    _orchestrate_cem.spawn(n_evals=n_evals, seed=seed)
-    print("CEM orchestrator launched on Modal (runs independently).")
-    print("Monitor: https://wandb.ai/avp2145-columbia-university/pusht_sweep")
+    _orchestrate_sweep.spawn(n_evals=n_evals, seed=seed)
+    print("Sweep orchestrator launched on Modal (runs independently).")
     print("When done, download results:")
     print("  modal volume get stableworldmodel sweep_results/pusht_sweep_plot.png .")
     print("  modal volume get stableworldmodel sweep_results/pusht_sweep.csv .")
@@ -722,12 +737,12 @@ def run_one_sweep(
 
 
 @app.local_entrypoint()
-def run_sweep(n_evals: int = 50, seed: int = 42):
+def run_sweep(n_evals: int = 50, seed: int = 99):
     """Spawn all 15 sweep jobs in parallel, report progress, then collect results.
 
     Examples:
         modal run modal_plan.py::run_sweep
-        modal run modal_plan.py::run_sweep --n-evals 50 --seed 42
+        modal run modal_plan.py::run_sweep --n-evals 50 --seed 99
     """
     sweep_jobs = []
     # pretrained + MPC+CEM
@@ -808,7 +823,7 @@ def download_all():
 def main(
     env_name: str = "pusht",
     method: str = "pretrained",
-    seed: int = 42,
+    seed: int = 99,
     n_evals: int = 50,
 ):
     """Run one seed of MPC planning.
